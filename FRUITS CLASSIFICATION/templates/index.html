@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Fruit Ripeness Classification</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🍎 Fruit Ripeness Classification Using CNN</h1>
+
+    <p class="subtitle">
+        Upload an image to identify the fruit and its ripeness.
+    </p>
+
+    <div class="card">
+
+        <form action="/predict"
+              method="POST"
+              enctype="multipart/form-data">
+
+            <input
+                type="file"
+                name="image"
+                accept="image/*"
+                required>
+
+            <br><br>
+
+            <button type="submit">
+                Predict
+            </button>
+
+        </form>
+
+    </div>
+
+
+    {% if error %}
+
+        <div class="error">
+            {{ error }}
+        </div>
+
+    {% endif %}
+
+
+    {% if image %}
+
+    <div class="result-card">
+
+        <h2>Prediction Result</h2>
+
+        <img src="{{ url_for('static',
+        filename='uploads/' + image) }}"
+        class="result-image">
+
+        <table>
+
+            <tr>
+                <td><b>Fruit</b></td>
+                <td>{{ fruit }}</td>
+            </tr>
+
+            <tr>
+                <td><b>Ripeness</b></td>
+
+                <td>
+
+                    {% if color=="green" %}
+
+                    <span class="green">
+                        🟢 {{ stage }}
+                    </span>
+
+                    {% elif color=="orange" %}
+
+                    <span class="orange">
+                        🟡 {{ stage }}
+                    </span>
+
+                    {% else %}
+
+                    <span class="red">
+                        🔴 {{ stage }}
+                    </span>
+
+                    {% endif %}
+
+                </td>
+
+            </tr>
+
+            <tr>
+
+                <td><b>Confidence</b></td>
+
+                <td>{{ confidence }}%</td>
+
+            </tr>
+
+            <tr>
+
+                <td><b>Prediction Time</b></td>
+
+                <td>{{ prediction_time }} sec</td>
+
+            </tr>
+
+        </table>
+
+        <h3>Confidence Level</h3>
+
+        <div class="progress">
+
+            <div class="progress-bar"
+                 style="width:{{ confidence }}%">
+
+                {{ confidence }}%
+
+            </div>
+
+    {% endif %}
+
+</div>
+
+</body>
+
+</html>

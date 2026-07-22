@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeFood AI - Food Safety Classification Dashboard</title>
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Dashboard Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Local Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <!-- Sidebar Section -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-shield-virus"></i>
+                    <span>SafeFood AI</span>
+                </div>
+                <div class="model-status">
+                    <span class="status-dot online"></span>
+                    <span>LSTM Classifier Active</span>
+                </div>
+            </div>
+
+            <!-- Dashboard Stats Sidebar Widget -->
+            <div class="sidebar-section">
+                <h3 class="section-title"><i class="fa-solid fa-chart-simple"></i> Session Metrics</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Analyzed</span>
+                        <span class="stat-value" id="stat-total">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Suspect</span>
+                        <span class="stat-value text-red" id="stat-suspect">0</span>
+                    </div>
+                    <div class="stat-card span-2">
+                        <span class="stat-label">Avg. Confidence</span>
+                        <span class="stat-value" id="stat-avg-conf">0.0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Templates Sidebar Widget -->
+            <div class="sidebar-section">
+                <h3 class="section-title"><i class="fa-solid fa-list-check"></i> Test Templates</h3>
+                <p class="section-desc">Click an example to load it into the analyzer:</p>
+                <div class="template-list">
+                    <button class="template-chip suspect" data-text="I ate a chicken burger at a local restaurant last night and now I have severe watery diarrhea, intense stomach cramps, and a high fever.">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Food Poisoning (Suspect)
+                    </button>
+                    <button class="template-chip suspect" data-text="The soup we ordered tasted extremely chemical, like bleach or detergent. Within minutes, my tongue felt numb and I started vomiting.">
+                        <i class="fa-solid fa-flask"></i> Chemical Contam. (Suspect)
+                    </button>
+                    <button class="template-chip concomitant" data-text="Along with the pasta, I also drank a bottle of mineral water which I bought from the local store. The water bottle was sealed.">
+                        <i class="fa-solid fa-bottle-water"></i> Safe Drink (Concomitant)
+                    </button>
+                    <button class="template-chip concomitant" data-text="We had vanilla ice cream for dessert. It was stored in a clean freezer and tasted perfectly fine.">
+                        <i class="fa-solid fa-ice-cream"></i> Normal Dessert (Concomitant)
+                    </button>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <p>SafeFood AI v1.0.0</p>
+                <p>© 2026 Food Safety Agency</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header bar -->
+            <header class="main-header">
+                <div class="header-title">
+                    <h1>Classification Dashboard</h1>
+                    <p>Identify suspect contaminated food products from symptom reports and complaints</p>
+                </div>
+                <div class="theme-badge">
+                    <i class="fa-solid fa-brain"></i>
+                    <span>Keras LSTM Model</span>
+                </div>
+            </header>
+
+            <div class="dashboard-grid">
+                <!-- Left Column: Input Analyzer -->
+                <div class="grid-col left">
+                    <section class="card input-card">
+                        <div class="card-header">
+                            <h2><i class="fa-solid fa-magnifying-glass-chart"></i> Complaint Analyzer</h2>
+                            <span class="card-subtitle">Enter symptom details or food logs below</span>
+                        </div>
+                        <div class="card-body">
+                            <form id="analyzer-form" class="analyzer-form">
+                                <div class="textarea-wrapper">
+                                    <textarea 
+                                        id="symptom-input" 
+                                        placeholder="Type or paste a complaint detail (e.g. 'I bought some tacos yesterday. Soon after eating, I developed nausea...')" 
+                                        required></textarea>
+                                    <div class="textarea-footer">
+                                        <span id="char-counter">0 / 1000 characters</span>
+                                        <button type="button" id="clear-btn" class="btn btn-secondary btn-icon-only" title="Clear text">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button type="submit" id="submit-btn" class="btn btn-primary btn-block">
+                                    <span>Run Analysis</span>
+                                    <i class="fa-solid fa-chevron-right"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right Column: Live Results -->
+                <div class="grid-col right">
+                    <section class="card result-card">
+                        <div class="card-header">
+                            <h2><i class="fa-solid fa-square-poll-vertical"></i> Analysis Result</h2>
+                            <span class="card-subtitle">AI Model Prediction Breakdown</span>
+                        </div>
+                        <div class="card-body">
+                            <!-- Empty / Placeholder State -->
+                            <div id="result-placeholder" class="result-placeholder">
+                                <i class="fa-solid fa-chart-line-down placeholder-icon"></i>
+                                <h3>Awaiting Analysis</h3>
+                                <p>Provide complaint text and click 'Run Analysis' to see model prediction output.</p>
+                            </div>
+
+                            <!-- Loading State -->
+                            <div id="result-loading" class="result-loading hidden">
+                                <div class="spinner"></div>
+                                <p>Processing through LSTM Layers...</p>
+                            </div>
+
+                            <!-- Actual Prediction Output -->
+                            <div id="result-display" class="result-display hidden">
+                                <div class="prediction-outcome-wrapper">
+                                    <div class="prediction-gauge-box">
+                                        <svg class="progress-ring" width="120" height="120">
+                                            <circle class="progress-ring__circle-bg" stroke="#1e293b" stroke-width="10" fill="transparent" r="50" cx="60" cy="60"/>
+                                            <circle class="progress-ring__circle" id="progress-circle" stroke="#10b981" stroke-width="10" fill="transparent" r="50" cx="60" cy="60"/>
+                                        </svg>
+                                        <div class="gauge-percentage">
+                                            <span id="result-confidence">0.0</span><span class="pct">%</span>
+                                        </div>
+                                    </div>
+                                    <div class="outcome-text">
+                                        <span class="label">Classification</span>
+                                        <div id="result-badge" class="badge">Suspect</div>
+                                        <div class="conf-text">Model Confidence</div>
+                                    </div>
+                                </div>
+
+                                <div class="insight-box" id="insight-box">
+                                    <div class="insight-title">
+                                        <i class="fa-solid fa-circle-info"></i>
+                                        <span>AI Assessment & Recommendation</span>
+                                    </div>
+                                    <p id="insight-desc"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Bottom Section: Analysis History Log -->
+            <section class="card history-card">
+                <div class="card-header flex-header">
+                    <div>
+                        <h2><i class="fa-solid fa-clock-rotate-left"></i> Session Logs</h2>
+                        <span class="card-subtitle">Historical records of complaints processed in this session</span>
+                    </div>
+                    <div class="header-actions">
+                        <button id="export-csv-btn" class="btn btn-secondary btn-sm">
+                            <i class="fa-solid fa-file-csv"></i> Export to CSV
+                        </button>
+                        <button id="clear-history-btn" class="btn btn-danger-outline btn-sm">
+                            <i class="fa-solid fa-xmark"></i> Clear Logs
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body scrollable-body">
+                    <div class="table-responsive">
+                        <table class="history-table" id="history-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 15%;">Timestamp</th>
+                                    <th style="width: 50%;">Complaint Text Snippet</th>
+                                    <th style="width: 18%;">Prediction</th>
+                                    <th style="width: 12%;">Confidence</th>
+                                    <th style="width: 5%;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-tbody">
+                                <!-- Dynamic rows inserted here -->
+                                <tr id="no-history-row">
+                                    <td colspan="5" class="text-center text-muted">No records analyzed yet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Main Client Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('analyzer-form');
+            const input = document.getElementById('symptom-input');
+            const charCounter = document.getElementById('char-counter');
+            const clearBtn = document.getElementById('clear-btn');
+            const submitBtn = document.getElementById('submit-btn');
+
+            const placeholder = document.getElementById('result-placeholder');
+            const loading = document.getElementById('result-loading');
+            const resultDisplay = document.getElementById('result-display');
+            const resultConfidence = document.getElementById('result-confidence');
+            const resultBadge = document.getElementById('result-badge');
+            const progressCircle = document.getElementById('progress-circle');
+            const insightBox = document.getElementById('insight-box');
+            const insightDesc = document.getElementById('insight-desc');
+
+            const historyTbody = document.getElementById('history-tbody');
+            const noHistoryRow = document.getElementById('no-history-row');
+            const exportCsvBtn = document.getElementById('export-csv-btn');
+            const clearHistoryBtn = document.getElementById('clear-history-btn');
+
+            // Sidebar stats
+            const statTotal = document.getElementById('stat-total');
+            const statSuspect = document.getElementById('stat-suspect');
+            const statAvgConf = document.getElementById('stat-avg-conf');
+
+            // Gauge calculations
+            const radius = progressCircle.r.baseVal.value;
+            const circumference = radius * 2 * Math.PI;
+            progressCircle.style.strokeDasharray = `${circumference} ${circumference}`;
+            progressCircle.style.strokeDashoffset = circumference;
+
+            function setGaugeValue(percent, classification) {
+                const offset = circumference - (percent / 100 * circumference);
+                progressCircle.style.strokeDashoffset = offset;
+                
+                // Color-code gauge based on prediction
+                if (classification === 'Suspect') {
+                    progressCircle.style.stroke = 'var(--red-primary)';
+                } else {
+                    progressCircle.style.stroke = 'var(--emerald-primary)';
+                }
+            }
+
+            // Load session data from localStorage
+            let sessionLogs = JSON.parse(localStorage.getItem('safefood_logs')) || [];
+            updateStatsAndHistoryTable();
+
+            // Textarea character counter
+            input.addEventListener('input', () => {
+                const count = input.value.length;
+                charCounter.textContent = `${count} / 1000 characters`;
+                if (count > 1000) {
+                    charCounter.style.color = 'var(--red-primary)';
+                } else {
+                    charCounter.style.color = 'var(--text-muted)';
+                }
+            });
+
+            // Clear input
+            clearBtn.addEventListener('click', () => {
+                input.value = '';
+                charCounter.textContent = '0 / 1000 characters';
+                charCounter.style.color = 'var(--text-muted)';
+                input.focus();
+            });
+
+            // Quick Fill Templates
+            document.querySelectorAll('.template-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    input.value = chip.getAttribute('data-text');
+                    input.dispatchEvent(new Event('input'));
+                    
+                    // Auto submit template
+                    form.dispatchEvent(new Event('submit'));
+                });
+            });
+
+            // Form Submit handler via AJAX
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const symptomText = input.value.trim();
+                if (!symptomText) return;
+
+                // Toggle loading view
+                placeholder.classList.add('hidden');
+                resultDisplay.classList.add('hidden');
+                loading.classList.remove('hidden');
+                submitBtn.disabled = true;
+                submitBtn.querySelector('span').textContent = 'Analyzing...';
+
+                try {
+                    const response = await fetch('/predict_api', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ symptom: symptomText })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('API request failed');
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        // Display output
+                        setTimeout(() => {
+                            loading.classList.add('hidden');
+                            resultDisplay.classList.remove('hidden');
+                            
+                            resultConfidence.textContent = data.confidence.toFixed(1);
+                            resultBadge.textContent = data.prediction;
+                            
+                            // Badge formatting
+                            resultBadge.className = 'badge'; // reset
+                            if (data.prediction === 'Suspect') {
+                                resultBadge.classList.add('badge-danger');
+                                insightBox.className = 'insight-box insight-danger';
+                                insightDesc.innerHTML = '<strong>🚨 High Priority Alert:</strong> The symptoms or description in this complaint are highly correlated with contaminated food products. Immediate investigation or product tracking is recommended.';
+                            } else {
+                                resultBadge.classList.add('badge-success');
+                                insightBox.className = 'insight-box insight-success';
+                                insightDesc.innerHTML = '<strong>✅ Standard Log:</strong> The complaint indicates secondary or general consumption (concomitant food product) with low correlation to direct contamination symptoms. Logged for standard compliance tracking.';
+                            }
+
+                            setGaugeValue(data.confidence, data.prediction);
+                            submitBtn.disabled = false;
+                            submitBtn.querySelector('span').textContent = 'Run Analysis';
+
+                            // Save to session history logs
+                            const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                            const logEntry = {
+                                timestamp: timestamp,
+                                text: symptomText,
+                                prediction: data.prediction,
+                                confidence: data.confidence
+                            };
+
+                            sessionLogs.unshift(logEntry); // Add to start
+                            localStorage.setItem('safefood_logs', JSON.stringify(sessionLogs));
+                            updateStatsAndHistoryTable();
+                        }, 600); // Small delay to feel the AI calculation
+                    } else {
+                        alert('Error: ' + data.error);
+                        resetResultState();
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    alert('Network error or server unavailable. Please try again.');
+                    resetResultState();
+                }
+            });
+
+            function resetResultState() {
+                loading.classList.add('hidden');
+                resultDisplay.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.querySelector('span').textContent = 'Run Analysis';
+            }
+
+            function updateStatsAndHistoryTable() {
+                // Update table
+                if (sessionLogs.length === 0) {
+                    noHistoryRow.classList.remove('hidden');
+                    // Remove other rows
+                    document.querySelectorAll('.history-item-row').forEach(row => row.remove());
+                } else {
+                    noHistoryRow.classList.add('hidden');
+                    document.querySelectorAll('.history-item-row').forEach(row => row.remove());
+
+                    sessionLogs.forEach((log, index) => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'history-item-row fade-in';
+                        
+                        const badgeClass = log.prediction === 'Suspect' ? 'table-badge badge-danger' : 'table-badge badge-success';
+                        
+                        // Limit text size in table
+                        const truncatedText = log.text.length > 80 ? log.text.substring(0, 80) + '...' : log.text;
+
+                        tr.innerHTML = `
+                            <td>${log.timestamp}</td>
+                            <td class="text-left-align" title="${log.text.replace(/"/g, '&quot;')}">${truncatedText}</td>
+                            <td><span class="${badgeClass}">${log.prediction}</span></td>
+                            <td class="font-semibold">${log.confidence.toFixed(1)}%</td>
+                            <td>
+                                <button class="btn-delete-row" data-index="${index}" title="Remove entry">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </td>
+                        `;
+                        historyTbody.appendChild(tr);
+                    });
+
+                    // Add delete listeners
+                    document.querySelectorAll('.btn-delete-row').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const index = parseInt(btn.getAttribute('data-index'));
+                            sessionLogs.splice(index, 1);
+                            localStorage.setItem('safefood_logs', JSON.stringify(sessionLogs));
+                            updateStatsAndHistoryTable();
+                        });
+                    });
+                }
+
+                // Update Stats
+                const total = sessionLogs.length;
+                const suspectCount = sessionLogs.filter(l => l.prediction === 'Suspect').length;
+                
+                let avgConfidence = 0.0;
+                if (total > 0) {
+                    const sum = sessionLogs.reduce((acc, curr) => acc + curr.confidence, 0);
+                    avgConfidence = sum / total;
+                }
+
+                statTotal.textContent = total;
+                statSuspect.textContent = suspectCount;
+                statAvgConf.textContent = avgConfidence.toFixed(1) + '%';
+            }
+
+            // Clear history button
+            clearHistoryBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to clear all session logs and statistics?')) {
+                    sessionLogs = [];
+                    localStorage.setItem('safefood_logs', JSON.stringify(sessionLogs));
+                    updateStatsAndHistoryTable();
+                }
+            });
+
+            // Export to CSV button
+            exportCsvBtn.addEventListener('click', () => {
+                if (sessionLogs.length === 0) {
+                    alert('No session logs available to export.');
+                    return;
+                }
+
+                let csvContent = 'data:text/csv;charset=utf-8,';
+                csvContent += 'Timestamp,Complaint,Prediction,Confidence\n';
+
+                sessionLogs.forEach(log => {
+                    const escapedText = log.text.replace(/"/g, '""');
+                    csvContent += `"${log.timestamp}","${escapedText}","${log.prediction}",${log.confidence.toFixed(1)}%\n`;
+                });
+
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement('a');
+                link.setAttribute('href', encodedUri);
+                link.setAttribute('download', `safefood_classification_session_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+        });
+    </script>
+</body>
+</html>
